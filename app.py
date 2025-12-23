@@ -156,7 +156,7 @@ def calculate_portfolio(prices, model, risk_measure, rf, risk_aversion, uncertai
         method_mu = 'hist'  # Historical mean
         method_cov = 'hist'  # Historical covariance
         
-        port.assets_stats(method_mu=method_mu, method_cov=method_cov, d=0.94)
+        port.assets_stats(method_mu=method_mu, method_cov=method_cov)
         
         # Set risk-free rate
         port.rf = rf
