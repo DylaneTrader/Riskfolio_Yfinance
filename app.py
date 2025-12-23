@@ -136,7 +136,7 @@ def download_data(tickers, start_date, end_date):
         
         # Clean data
         prices = prices.dropna(how='all')
-        prices = prices.fillna(method='ffill').fillna(method='bfill')
+        prices = prices.ffill().bfill()
         
         return prices
     except Exception as e:
