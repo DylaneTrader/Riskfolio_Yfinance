@@ -37,7 +37,7 @@ st.session_state.page = page
 
 st.sidebar.markdown("---")
 
-# Dictionnaire de traduction des mesures de risque
+# Dictionnaire de traduction des mesures de risque (modèles classiques)
 RISK_MEASURES_DICT = {
     "MV": "Variance (Écart-type)",
     "MAD": "Écart Absolu Moyen (MAD)",
@@ -52,6 +52,49 @@ RISK_MEASURES_DICT = {
     "CDaR": "Drawdown Conditionnel à Risque (CDaR)",
     "UCI": "Indice Ulcer",
     "EDaR": "Drawdown Entropic à Risque (EDaR)"
+}
+
+# Dictionnaire des 32 mesures de risque pour HRP et HERC
+HRP_HERC_RISK_MEASURES = {
+    # Mesures de Dispersion
+    "vol": "Écart-type (Standard Deviation)",
+    "variance": "Variance",
+    "kurt": "Racine Carrée de la Kurtosis",
+    "mad": "Écart Absolu Moyen (MAD)",
+    "gmd": "Différence Moyenne de Gini (GMD)",
+    "cvrg": "Plage CVaR (CVaR Range)",
+    "tgrg": "Plage Tail Gini (Tail Gini Range)",
+    "rg": "Plage (Range)",
+    
+    # Mesures de Risque à la Baisse
+    "semi": "Écart-type Semi (Semi Standard Deviation)",
+    "skurt": "Racine Carrée Semi-Kurtosis",
+    "flpm": "Premier Moment Partiel Inférieur (Omega Ratio)",
+    "slpm": "Second Moment Partiel Inférieur (Sortino Ratio)",
+    "var": "Valeur à Risque (VaR)",
+    "cvar": "Valeur à Risque Conditionnelle (CVaR)",
+    "evar": "Valeur à Risque Entropic (EVaR)",
+    "rlvar": "Valeur à Risque Relativiste (RLVaR)",
+    "tg": "Tail Gini",
+    "wr": "Pire Réalisation (Minimax)",
+    
+    # Mesures de Drawdown (rendements composés)
+    "mdd": "Drawdown Maximum (Calmar Ratio)",
+    "add": "Drawdown Moyen",
+    "uci": "Indice Ulcer",
+    "dar": "Drawdown à Risque (DaR)",
+    "cdar": "Drawdown Conditionnel à Risque (CDaR)",
+    "edar": "Drawdown Entropic à Risque (EDaR)",
+    "rdar": "Drawdown Relativiste à Risque (RDaR)",
+    
+    # Mesures de Drawdown (rendements non composés)
+    "mdd_rel": "Drawdown Maximum - Non Composé",
+    "add_rel": "Drawdown Moyen - Non Composé",
+    "uci_rel": "Indice Ulcer - Non Composé",
+    "dar_rel": "DaR - Non Composé",
+    "cdar_rel": "CDaR - Non Composé",
+    "edar_rel": "EDaR - Non Composé",
+    "rdar_rel": "RDaR - Non Composé"
 }
 
 # Functions
@@ -144,6 +187,18 @@ def calculate_portfolio(prices, model, risk_measure, rf, risk_aversion, uncertai
                 w = port.wc_optimization(model='Classic', rm=risk_measure, obj='Sharpe', rf=rf, l=0, Umu='box', Ucov='box', epsilon=uncertainty)
             elif "Utilité Maximum" in model:
                 w = port.wc_optimization(model='Classic', rm=risk_measure, obj='Utility', rf=rf, l=risk_aversion, Umu='box', Ucov='box', epsilon=uncertainty)
+        
+        elif model == "Hierarchical Risk Parity (HRP)":
+            # HRP optimization
+            w = port.hrp_optimization(model='HRP', codependence='pearson', rm=risk_measure, rf=rf, linkage='single', leaf_order=True)
+            
+        elif model == "Hierarchical Equal Risk Contribution (HERC)":
+            # HERC optimization
+            w = port.herc_optimization(model='HERC', codependence='pearson', rm=risk_measure, rf=rf, linkage='single', leaf_order=True)
+            
+        elif model == "Nested Clustered Optimization (NCO)":
+            # NCO optimization - utilise les mêmes paramètres que les modèles classiques
+            w = port.nco_optimization(model='NCO', rm=risk_measure, obj='Sharpe', rf=rf, linkage='single', leaf_order=True)
         
         if w is None or w.sum().sum() == 0:
             st.error("L'optimisation a échoué. Essayez différents paramètres.")
@@ -364,12 +419,13 @@ def show_home_page():
     ## Bienvenue dans l'Application d'Optimisation de Portefeuille
     
     Cette application vous permet d'optimiser des portefeuilles financiers en utilisant diverses 
-    méthodes quantitatives avancées basées sur la bibliothèque **Riskfolio-Lib**.
+    méthodes quantitatives avancées, incluant des modèles classiques et de machine learning, 
+    basée sur la bibliothèque **Riskfolio-Lib**.
     
     ### 🎯 Fonctionnalités Principales
     
-    - **Multiples Modèles d'Optimisation**: Choisissez parmi 10 modèles différents
-    - **Mesures de Risque Variées**: 13 mesures de risque disponibles
+    - **13 Modèles d'Optimisation**: Modèles classiques et modèles ML (HRP, HERC, NCO)
+    - **45 Mesures de Risque**: 13 mesures classiques + 32 mesures pour HRP/HERC
     - **Import de Données Flexible**: Yahoo Finance, CSV ou fichiers Excel
     - **Visualisations Interactives**: Graphiques de poids, frontière efficiente, corrélations
     - **Statistiques Détaillées**: Analyse descriptive et indicateurs de performance
@@ -390,10 +446,10 @@ def show_home_page():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.info("**10** Modèles d'Optimisation")
+        st.info("**13** Modèles d'Optimisation")
     
     with col2:
-        st.info("**13** Mesures de Risque")
+        st.info("**45** Mesures de Risque")
     
     with col3:
         st.info("**3** Sources de Données")
@@ -403,6 +459,7 @@ def show_home_page():
     st.markdown("""
     ### 📚 Modèles Disponibles
     
+    #### Modèles Classiques
     - Portefeuille de Rendement Maximum
     - Portefeuille de Risque Minimum
     - Portefeuille de Sharpe Maximum
@@ -411,9 +468,15 @@ def show_home_page():
     - Portefeuille de Parité de Risque Relaxée
     - Portefeuilles Robustes (4 variantes)
     
+    #### Modèles de Machine Learning
+    - Hierarchical Risk Parity (HRP)
+    - Hierarchical Equal Risk Contribution (HERC)
+    - Nested Clustered Optimization (NCO)
+    
     ### 🔍 Mesures de Risque
     
-    Variance, CVaR, Drawdown Maximum, et bien d'autres...
+    - **13 mesures classiques**: Variance, CVaR, Drawdown Maximum, etc.
+    - **32 mesures HRP/HERC**: Dispersions, Downside, Drawdowns composés et non-composés
     
     Consultez la page **"À propos"** pour plus de détails sur chaque modèle.
     """)
@@ -488,7 +551,10 @@ def show_optimization_page():
         "Portefeuille Robuste - Rendement Maximum",
         "Portefeuille Robuste - Risque Minimum",
         "Portefeuille Robuste - Sharpe Maximum",
-        "Portefeuille Robuste - Utilité Maximum"
+        "Portefeuille Robuste - Utilité Maximum",
+        "Hierarchical Risk Parity (HRP)",
+        "Hierarchical Equal Risk Contribution (HERC)",
+        "Nested Clustered Optimization (NCO)"
     ]
     
     selected_model = st.sidebar.selectbox(
@@ -496,16 +562,24 @@ def show_optimization_page():
         options=optimization_models
     )
     
-    # Risk measure selection
+    # Risk measure selection - différent pour HRP/HERC
     st.sidebar.subheader("Mesure de Risque")
-    risk_measures = list(RISK_MEASURES_DICT.keys())
-    risk_measure_names = [f"{k}: {v}" for k, v in RISK_MEASURES_DICT.items()]
+    
+    # Vérifier si le modèle est HRP ou HERC pour afficher les bonnes mesures
+    if selected_model in ["Hierarchical Risk Parity (HRP)", "Hierarchical Equal Risk Contribution (HERC)"]:
+        risk_measures = list(HRP_HERC_RISK_MEASURES.keys())
+        risk_measure_names = [f"{k}: {v}" for k, v in HRP_HERC_RISK_MEASURES.items()]
+        default_index = 0  # "vol" par défaut
+    else:
+        risk_measures = list(RISK_MEASURES_DICT.keys())
+        risk_measure_names = [f"{k}: {v}" for k, v in RISK_MEASURES_DICT.items()]
+        default_index = 0
     
     selected_risk_index = st.sidebar.selectbox(
         "Sélectionnez la mesure de risque",
         options=range(len(risk_measures)),
         format_func=lambda x: risk_measure_names[x],
-        index=0
+        index=default_index
     )
     risk_measure = risk_measures[selected_risk_index]
     
@@ -900,6 +974,169 @@ def show_about_page():
         - 4 variantes : Rendement Max, Risque Min, Sharpe Max, Utilité Max
         """)
     
+    # Modèles de Machine Learning
+    st.markdown("---")
+    st.header("🤖 Modèles de Machine Learning")
+    
+    # Hierarchical Risk Parity (HRP)
+    with st.expander("📊 Hierarchical Risk Parity (HRP)"):
+        st.markdown("""
+        ### Objectif
+        Allouer les poids du portefeuille en utilisant une approche hiérarchique basée sur le clustering 
+        des actifs selon leur structure de corrélation, puis en appliquant la parité de risque naive.
+        
+        ### Méthodologie
+        
+        Le modèle HRP se décompose en trois étapes principales :
+        
+        **1. Regroupement Hiérarchique (Tree Clustering)**
+        
+        Utilise la matrice de distance basée sur les corrélations :
+        
+        $$
+        d_{ij} = \\sqrt{\\frac{1 - \\rho_{ij}}{2}}
+        $$
+        
+        où $\\rho_{ij}$ est la corrélation entre les actifs $i$ et $j$.
+        
+        **2. Ordonnancement Quasi-Diagonal (Quasi-Diagonalization)**
+        
+        Réorganise les actifs selon le dendrogramme pour former des clusters cohérents.
+        
+        **3. Allocation Récursive Bisectionnelle**
+        
+        Divise récursivement le portefeuille en deux groupes et alloue le capital inversement 
+        proportionnel à la variance de chaque groupe :
+        
+        $$
+        w_1 = \\frac{\\sigma_2^{-1}}{\\sigma_1^{-1} + \\sigma_2^{-1}}, \\quad w_2 = 1 - w_1
+        $$
+        
+        ### Caractéristiques
+        - ✅ Stable et robuste, peu sensible aux erreurs d'estimation
+        - ✅ Ne nécessite pas l'inversion de la matrice de covariance
+        - ✅ Peut utiliser 32 mesures de risque différentes
+        - ✅ Préserve la structure de corrélation des actifs
+        - ✅ Évite les poids négatifs sans contraintes explicites
+        - ⚠️ Non optimal au sens de Markowitz
+        - 📊 Particulièrement efficace avec des actifs fortement corrélés
+        """)
+    
+    # Hierarchical Equal Risk Contribution (HERC)
+    with st.expander("⚖️ Hierarchical Equal Risk Contribution (HERC)"):
+        st.markdown("""
+        ### Objectif
+        Extension du modèle HRP qui alloue le capital de manière à ce que chaque cluster d'actifs 
+        contribue de façon égale au risque total du portefeuille.
+        
+        ### Méthodologie
+        
+        HERC suit les mêmes étapes que HRP mais avec une allocation différente :
+        
+        **1-2. Tree Clustering et Quasi-Diagonalization**
+        
+        Identique à HRP.
+        
+        **3. Allocation par Contribution au Risque Égale**
+        
+        Au lieu d'inverser les variances, HERC alloue pour égaliser les contributions au risque :
+        
+        $$
+        RC_i = w_i \\cdot \\sigma_i = \\frac{\\text{Risk Total}}{N_{clusters}}
+        $$
+        
+        où $RC_i$ est la contribution au risque du cluster $i$.
+        
+        ### Différence avec HRP
+        
+        | Aspect | HRP | HERC |
+        |--------|-----|------|
+        | **Allocation** | Inverse de la variance | Contribution au risque égale |
+        | **Objectif** | Diversification | Parité de risque par cluster |
+        | **Concentration** | Peut être concentré | Plus équilibré |
+        
+        ### Caractéristiques
+        - ✅ Combine clustering hiérarchique et parité de risque
+        - ✅ Meilleure diversification que HRP
+        - ✅ Contributions au risque équilibrées entre clusters
+        - ✅ Peut utiliser 32 mesures de risque différentes
+        - ✅ Robuste et stable
+        - ⚠️ Calculs légèrement plus complexes que HRP
+        - 📊 Idéal quand on veut équilibrer le risque entre secteurs/classes d'actifs
+        """)
+    
+    # Nested Clustered Optimization (NCO)
+    with st.expander("🎯 Nested Clustered Optimization (NCO)"):
+        st.markdown("""
+        ### Objectif
+        Combiner l'approche hiérarchique de HRP/HERC avec l'optimisation classique de Markowitz 
+        pour obtenir les avantages des deux méthodes.
+        
+        ### Méthodologie
+        
+        NCO utilise une approche en deux étapes :
+        
+        **1. Optimisation Intra-Cluster**
+        
+        Pour chaque cluster $C_k$ identifié par clustering hiérarchique, optimise localement :
+        
+        $$
+        \\begin{aligned}
+        \\max_{w_k} \\quad & \\text{Sharpe}(w_k) = \\frac{\\mu_k^T w_k - r_f}{\\sqrt{w_k^T \\Sigma_k w_k}} \\\\
+        \\text{s.t.} \\quad & w_k^T \\mathbf{1} = 1, \\quad w_k \\geq 0
+        \\end{aligned}
+        $$
+        
+        où $\\mu_k$ et $\\Sigma_k$ sont limités aux actifs du cluster $C_k$.
+        
+        **2. Allocation Inter-Cluster**
+        
+        Alloue le capital entre les portefeuilles optimisés de chaque cluster :
+        
+        $$
+        \\begin{aligned}
+        \\max_{\\alpha} \\quad & \\text{Sharpe}(\\alpha) = \\frac{\\mu_c^T \\alpha - r_f}{\\sqrt{\\alpha^T \\Sigma_c \\alpha}} \\\\
+        \\text{s.t.} \\quad & \\alpha^T \\mathbf{1} = 1, \\quad \\alpha \\geq 0
+        \\end{aligned}
+        $$
+        
+        où $\\mu_c$ et $\\Sigma_c$ sont calculés à partir des portefeuilles de chaque cluster.
+        
+        **3. Poids Final**
+        
+        $$
+        w_i^{\\text{final}} = \\alpha_{k(i)} \\cdot w_i^{(k)}
+        $$
+        
+        où $k(i)$ est le cluster auquel appartient l'actif $i$.
+        
+        ### Avantages par rapport à HRP/HERC
+        
+        | Caractéristique | NCO | HRP/HERC |
+        |-----------------|-----|----------|
+        | **Optimalité** | Optimisation Markowitz par cluster | Parité de risque naive |
+        | **Performance** | Potentiellement supérieure | Plus conservative |
+        | **Stabilité** | Moyenne | Élevée |
+        | **Complexité** | Élevée | Faible |
+        
+        ### Caractéristiques
+        - ✅ Combine robustesse du clustering et optimalité de Markowitz
+        - ✅ Réduit le risque de sur-optimisation
+        - ✅ Meilleure performance out-of-sample que Markowitz classique
+        - ✅ Exploite la structure de corrélation des actifs
+        - ⚠️ Plus complexe à calculer
+        - ⚠️ Nécessite suffisamment d'actifs par cluster
+        - 📊 Optimal quand les clusters sont bien définis (ex: secteurs, géographies)
+        
+        ### Quand Utiliser NCO ?
+        
+        - **Oui** : Portefeuille multi-secteurs ou multi-classes d'actifs
+        - **Oui** : Besoin d'optimisation mais avec structure hiérarchique
+        - **Oui** : Données historiques suffisantes par cluster
+        - **Non** : Peu d'actifs (< 15-20)
+        - **Non** : Clusters mal définis ou très corrélés
+        """)
+    
     # Mesures de Risque
     st.markdown("---")
     st.header("📊 Mesures de Risque")
@@ -931,6 +1168,158 @@ def show_about_page():
         CVaR appliqué aux drawdowns.
         
         Et bien d'autres mesures spécialisées...
+        """)
+    
+    # Les 32 mesures de risque pour HRP/HERC
+    with st.expander("📋 Les 32 Mesures de Risque pour HRP et HERC"):
+        st.markdown("""
+        Les modèles HRP et HERC peuvent utiliser **32 mesures de risque différentes** pour la parité de risque naive, 
+        offrant une flexibilité exceptionnelle.
+        
+        ### 🔵 1. Mesures de Dispersion (8 mesures)
+        
+        **Standard Deviation (vol)**
+        $$\\sigma = \\sqrt{\\frac{1}{n}\\sum_{i=1}^{n}(r_i - \\bar{r})^2}$$
+        Mesure classique de volatilité.
+        
+        **Variance**
+        $$\\text{Var} = \\sigma^2$$
+        Carré de l'écart-type.
+        
+        **Square Root Kurtosis (kurt)**
+        $$\\text{Kurt}^{1/4} = \\left(\\frac{1}{n}\\sum_{i=1}^{n}\\frac{(r_i - \\bar{r})^4}{\\sigma^4}\\right)^{1/4}$$
+        Mesure la "queue" de la distribution.
+        
+        **Mean Absolute Deviation (MAD)**
+        $$\\text{MAD} = \\frac{1}{n}\\sum_{i=1}^{n}|r_i - \\bar{r}|$$
+        Moyenne des écarts absolus.
+        
+        **Gini Mean Difference (GMD)**
+        $$\\text{GMD} = \\frac{1}{n(n-1)}\\sum_{i=1}^{n}\\sum_{j=1}^{n}|r_i - r_j|$$
+        Différence moyenne entre toutes les paires.
+        
+        **CVaR Range (cvrg)**
+        $$\\text{CVaR Range} = \\text{CVaR}^+ - \\text{CVaR}^-$$
+        Plage entre CVaR positif et négatif.
+        
+        **Tail Gini Range (tgrg)**
+        Gini calculé sur les queues de distribution.
+        
+        **Range (rg)**
+        $$\\text{Range} = \\max(r) - \\min(r)$$
+        Différence entre max et min.
+        
+        ---
+        
+        ### 🔴 2. Mesures de Risque à la Baisse (10 mesures)
+        
+        **Semi Standard Deviation (semi)**
+        $$\\text{SemiSD} = \\sqrt{\\frac{1}{n}\\sum_{r_i<0}r_i^2}$$
+        Volatilité des rendements négatifs uniquement.
+        
+        **Square Root Semi Kurtosis (skurt)**
+        Kurtosis calculée sur les rendements négatifs.
+        
+        **First Lower Partial Moment (flpm) - Omega Ratio**
+        $$\\text{FLPM} = \\frac{1}{n}\\sum_{r_i<\\tau}(\\tau - r_i)$$
+        Moyenne des shortfalls par rapport à un seuil $\\tau$.
+        
+        **Second Lower Partial Moment (slpm) - Sortino Ratio**
+        $$\\text{SLPM} = \\sqrt{\\frac{1}{n}\\sum_{r_i<\\tau}(\\tau - r_i)^2}$$
+        Racine carrée des écarts carrés négatifs.
+        
+        **Value at Risk (VaR)**
+        $$\\text{VaR}_\\alpha = -\\inf\\{x : P(r \\leq x) \\geq \\alpha\\}$$
+        Perte maximale avec probabilité $\\alpha$ (ex: 95%).
+        
+        **Conditional Value at Risk (CVaR)**
+        $$\\text{CVaR}_\\alpha = E[r | r \\leq \\text{VaR}_\\alpha]$$
+        Moyenne des pertes au-delà du VaR.
+        
+        **Entropic Value at Risk (EVaR)**
+        $$\\text{EVaR}_\\alpha = \\inf_{z>0}\\left\\{z\\ln\\left(\\frac{1}{\\alpha}\\right) + z\\ln\\left(E[e^{-r/z}]\\right)\\right\\}$$
+        Version entropique du VaR.
+        
+        **Relativistic Value at Risk (RLVaR)**
+        Variante relativiste tenant compte de la distribution complète.
+        
+        **Tail Gini (tg)**
+        $$\\text{TG} = \\frac{1}{n_\\alpha(n_\\alpha-1)}\\sum_{r_i \\leq \\text{VaR}}\\sum_{r_j \\leq \\text{VaR}}|r_i - r_j|$$
+        Gini sur la queue de distribution.
+        
+        **Worst Realization (wr) - Minimax**
+        $$\\text{WR} = \\min(r)$$
+        Le pire rendement observé.
+        
+        ---
+        
+        ### 📉 3. Mesures de Drawdown (14 mesures)
+        
+        #### Rendements Composés (7 mesures)
+        
+        **Maximum Drawdown (mdd) - Calmar Ratio**
+        $$\\text{MDD} = \\max_{t}\\left(\\frac{\\max_{s \\leq t}V_s - V_t}{\\max_{s \\leq t}V_s}\\right)$$
+        Plus grande baisse depuis un pic.
+        
+        **Average Drawdown (add)**
+        $$\\text{ADD} = \\frac{1}{T}\\sum_{t=1}^{T}\\text{DD}_t$$
+        Moyenne de tous les drawdowns.
+        
+        **Ulcer Index (uci)**
+        $$\\text{UCI} = \\sqrt{\\frac{1}{T}\\sum_{t=1}^{T}\\text{DD}_t^2}$$
+        Racine carrée de la moyenne des drawdowns carrés.
+        
+        **Drawdown at Risk (dar)**
+        $$\\text{DaR}_\\alpha = -\\inf\\{x : P(\\text{DD} \\leq x) \\geq \\alpha\\}$$
+        VaR appliqué aux drawdowns.
+        
+        **Conditional Drawdown at Risk (cdar)**
+        $$\\text{CDaR}_\\alpha = E[\\text{DD} | \\text{DD} \\geq \\text{DaR}_\\alpha]$$
+        CVaR appliqué aux drawdowns.
+        
+        **Entropic Drawdown at Risk (edar)**
+        EVaR appliqué aux drawdowns.
+        
+        **Relativistic Drawdown at Risk (rdar)**
+        RLVaR appliqué aux drawdowns.
+        
+        #### Rendements Non Composés (7 mesures)
+        
+        Les mêmes 7 mesures calculées sur les rendements arithmétiques (non composés) :
+        - **mdd_rel**, **add_rel**, **uci_rel**
+        - **dar_rel**, **cdar_rel**, **edar_rel**, **rdar_rel**
+        
+        Utile pour les portefeuilles avec rééquilibrage fréquent.
+        
+        ---
+        
+        ### 📊 Tableau Récapitulatif
+        
+        | Catégorie | Nombre | Exemples Clés |
+        |-----------|--------|---------------|
+        | **Dispersion** | 8 | vol, variance, mad, gmd |
+        | **Downside** | 10 | semi, var, cvar, evar |
+        | **Drawdown Composé** | 7 | mdd, cdar, uci |
+        | **Drawdown Non Composé** | 7 | mdd_rel, cdar_rel, uci_rel |
+        | **TOTAL** | **32** | - |
+        
+        ### 💡 Recommandations
+        
+        **Pour la plupart des cas** : `vol` (Standard Deviation)
+        - Simple et intuitif
+        - Comparable à Markowitz
+        
+        **Pour risque asymétrique** : `cvar` ou `semi`
+        - Mesure uniquement le risque de baisse
+        - Mieux adapté aux rendements non-normaux
+        
+        **Pour gestion de drawdown** : `cdar` ou `mdd`
+        - Focus sur les pertes cumulées
+        - Pertinent pour allocation long-terme
+        
+        **Pour robustesse** : `mad` ou `gmd`
+        - Moins sensibles aux valeurs extrêmes
+        - Alternatives robustes à la variance
         """)
     
     # Théorie de Markowitz
@@ -975,15 +1364,24 @@ def show_about_page():
     st.markdown("""
     ### 📖 Références
     
+    **Théorie Classique**
     - Markowitz, H. (1952). "Portfolio Selection". The Journal of Finance.
     - Rockafellar, R. T., & Uryasev, S. (2000). "Optimization of conditional value-at-risk."
     - Maillard, S., Roncalli, T., & Teïletche, J. (2010). "The properties of equally weighted risk contribution portfolios."
     - Ben-Tal, A., & Nemirovski, A. (1998). "Robust convex optimization."
     
+    **Modèles de Machine Learning**
+    - López de Prado, M. (2016). "Building Diversified Portfolios that Outperform Out of Sample". Journal of Portfolio Management.
+    - Raffinot, T. (2017). "Hierarchical Clustering-Based Asset Allocation". Journal of Portfolio Management.
+    - López de Prado, M. (2020). "Machine Learning for Asset Managers". Cambridge University Press.
+    - Raffinot, T. (2018). "The Hierarchical Equal Risk Contribution Portfolio". SSRN Working Paper.
+    
     ### 🔗 Liens Utiles
     
     - [Documentation Riskfolio-Lib](https://riskfolio-lib.readthedocs.io/)
     - [Code source sur GitHub](https://github.com/dcajasn/Riskfolio-Lib)
+    - [Article HRP - López de Prado](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2708678)
+    - [Article HERC - Raffinot](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3237540)
     """)
 
 # ============================================================================
