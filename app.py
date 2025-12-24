@@ -13,6 +13,23 @@ import riskfolio as rp
 import warnings
 from io import BytesIO
 
+# Import des modèles d'optimisation
+from models import (
+    optimize_max_return,
+    optimize_min_risk,
+    optimize_max_sharpe,
+    optimize_max_utility,
+    optimize_risk_parity,
+    optimize_relaxed_risk_parity,
+    optimize_robust_max_return,
+    optimize_robust_min_risk,
+    optimize_robust_max_sharpe,
+    optimize_robust_max_utility,
+    optimize_hrp,
+    optimize_herc,
+    optimize_nco
+)
+
 warnings.filterwarnings('ignore')
 
 # Page configuration
@@ -138,73 +155,56 @@ def read_uploaded_file(uploaded_file):
         return None
 
 def calculate_portfolio(prices, model, risk_measure, rf, risk_aversion, uncertainty):
-    """Calcule les poids optimaux du portefeuille selon le modèle sélectionné"""
+    """
+    Calcule les poids optimaux du portefeuille selon le modèle sélectionné
+    Utilise les modules séparés dans le dossier models/
+    """
     try:
         # Calculate returns
         returns = prices.pct_change().dropna()
         
-        # Create portfolio object
-        port = rp.Portfolio(returns=returns)
+        # Dictionnaire de mapping des modèles vers les fonctions
+        model_functions = {
+            "Portefeuille de Rendement Maximum": optimize_max_return,
+            "Portefeuille de Risque Minimum": optimize_min_risk,
+            "Portefeuille de Sharpe Maximum": optimize_max_sharpe,
+            "Portefeuille d'Utilité Maximum": optimize_max_utility,
+            "Portefeuille de Parité de Risque": optimize_risk_parity,
+            "Portefeuille de Parité de Risque Relaxée": optimize_relaxed_risk_parity,
+            "Portefeuille Robuste - Rendement Maximum": optimize_robust_max_return,
+            "Portefeuille Robuste - Risque Minimum": optimize_robust_min_risk,
+            "Portefeuille Robuste - Sharpe Maximum": optimize_robust_max_sharpe,
+            "Portefeuille Robuste - Utilité Maximum": optimize_robust_max_utility,
+            "Hierarchical Risk Parity (HRP)": optimize_hrp,
+            "Hierarchical Equal Risk Contribution (HERC)": optimize_herc,
+            "Nested Clustered Optimization (NCO)": optimize_nco
+        }
         
-        # Calculate mean and covariance
-        method_mu = 'hist'  # Historical mean
-        method_cov = 'hist'  # Historical covariance
+        # Obtenir la fonction d'optimisation correspondante
+        optimize_func = model_functions.get(model)
         
-        port.assets_stats(method_mu=method_mu, method_cov=method_cov)
+        if optimize_func is None:
+            st.error(f"Modèle non reconnu: {model}")
+            return None, None, None
         
-        # Set risk-free rate
-        port.rf = rf
-        
-        # Optimize based on selected model
-        w = None
-        
-        if model == "Portefeuille de Rendement Maximum":
-            w = port.optimization(model='Classic', rm=risk_measure, obj='MaxRet', rf=rf, l=0, hist=True)
-            
-        elif model == "Portefeuille de Risque Minimum":
-            w = port.optimization(model='Classic', rm=risk_measure, obj='MinRisk', rf=rf, l=0, hist=True)
-            
-        elif model == "Portefeuille de Sharpe Maximum":
-            w = port.optimization(model='Classic', rm=risk_measure, obj='Sharpe', rf=rf, l=0, hist=True)
-            
-        elif model == "Portefeuille d'Utilité Maximum":
-            w = port.optimization(model='Classic', rm=risk_measure, obj='Utility', rf=rf, l=risk_aversion, hist=True)
-            
-        elif model == "Portefeuille de Parité de Risque":
-            w = port.rp_optimization(model='Classic', rm=risk_measure, rf=rf, b=None, hist=True)
-            
-        elif model == "Portefeuille de Parité de Risque Relaxée":
-            # Relaxed risk parity with constraints
-            w = port.rrp_optimization(model='Classic', rm=risk_measure, rf=rf, b=None, hist=True)
-            
-        elif model.startswith("Portefeuille Robuste"):
-            # Worst case optimization
-            if "Rendement Maximum" in model:
-                w = port.wc_optimization(model='Classic', rm=risk_measure, obj='MaxRet', rf=rf, l=0, Umu='box', Ucov='box', epsilon=uncertainty)
-            elif "Risque Minimum" in model:
-                w = port.wc_optimization(model='Classic', rm=risk_measure, obj='MinRisk', rf=rf, l=0, Umu='box', Ucov='box', epsilon=uncertainty)
-            elif "Sharpe Maximum" in model:
-                w = port.wc_optimization(model='Classic', rm=risk_measure, obj='Sharpe', rf=rf, l=0, Umu='box', Ucov='box', epsilon=uncertainty)
-            elif "Utilité Maximum" in model:
-                w = port.wc_optimization(model='Classic', rm=risk_measure, obj='Utility', rf=rf, l=risk_aversion, Umu='box', Ucov='box', epsilon=uncertainty)
-        
-        elif model == "Hierarchical Risk Parity (HRP)":
-            # HRP optimization
-            w = port.hrp_optimization(model='HRP', codependence='pearson', rm=risk_measure, rf=rf, linkage='single', leaf_order=True)
-            
-        elif model == "Hierarchical Equal Risk Contribution (HERC)":
-            # HERC optimization
-            w = port.herc_optimization(model='HERC', codependence='pearson', rm=risk_measure, rf=rf, linkage='single', leaf_order=True)
-            
-        elif model == "Nested Clustered Optimization (NCO)":
-            # NCO optimization - utilise les mêmes paramètres que les modèles classiques
-            w = port.nco_optimization(model='NCO', rm=risk_measure, obj='Sharpe', rf=rf, linkage='single', leaf_order=True)
+        # Appeler la fonction d'optimisation avec les paramètres appropriés
+        w, port, returns_calc = optimize_func(
+            returns=returns,
+            risk_measure=risk_measure,
+            rf=rf,
+            risk_aversion=risk_aversion,
+            uncertainty=uncertainty
+        )
         
         if w is None or w.sum().sum() == 0:
             st.error("L'optimisation a échoué. Essayez différents paramètres.")
-            return None, None
+            return None, None, None
             
-        return w, port
+        return w, port, returns_calc
+        
+    except Exception as e:
+        st.error(f"Erreur lors de l'optimisation: {str(e)}")
+        return None, None, None
         
     except Exception as e:
         st.error(f"Erreur lors de l'optimisation: {str(e)}")
@@ -408,6 +408,78 @@ def plot_correlation_matrix(returns):
     )
     
     return fig
+
+def plot_dendrogram(returns, linkage='ward', codependence='pearson'):
+    """Affiche le dendrogramme pour les modèles hiérarchiques"""
+    try:
+        from scipy.cluster.hierarchy import dendrogram, linkage as sp_linkage
+        from scipy.spatial.distance import squareform
+        
+        # Calculate distance matrix based on codependence method
+        if codependence == 'pearson':
+            corr = returns.corr()
+            # Convert correlation to distance: d = sqrt(0.5 * (1 - corr))
+            dist = np.sqrt(0.5 * (1 - corr))
+        elif codependence == 'spearman':
+            corr = returns.corr(method='spearman')
+            dist = np.sqrt(0.5 * (1 - corr))
+        elif codependence == 'kendall':
+            corr = returns.corr(method='kendall')
+            dist = np.sqrt(0.5 * (1 - corr))
+        else:
+            corr = returns.corr()
+            dist = np.sqrt(0.5 * (1 - corr))
+        
+        # Convert to condensed distance matrix
+        dist_condensed = squareform(dist, checks=False)
+        
+        # Perform hierarchical clustering
+        Z = sp_linkage(dist_condensed, method=linkage)
+        
+        # Create dendrogram
+        fig = go.Figure()
+        
+        # Calculate dendrogram data
+        dendro = dendrogram(Z, labels=returns.columns.tolist(), no_plot=True)
+        
+        # Add lines for dendrogram
+        icoord = np.array(dendro['icoord'])
+        dcoord = np.array(dendro['dcoord'])
+        
+        for i in range(len(icoord)):
+            fig.add_trace(go.Scatter(
+                x=icoord[i],
+                y=dcoord[i],
+                mode='lines',
+                line=dict(color='rgb(100,100,100)', width=1),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+        
+        # Add labels
+        labels = dendro['ivl']
+        x_labels = np.arange(5, len(labels) * 10 + 5, 10)
+        
+        fig.update_layout(
+            title=f"Dendrogramme (Clustering Hiérarchique - {linkage.capitalize()})",
+            xaxis=dict(
+                tickmode='array',
+                tickvals=x_labels,
+                ticktext=labels,
+                tickangle=-45
+            ),
+            yaxis_title="Distance",
+            height=500,
+            showlegend=False,
+            plot_bgcolor='white'
+        )
+        
+        return fig
+        
+    except Exception as e:
+        st.warning(f"Impossible d'afficher le dendrogramme: {str(e)}")
+        return None
+
 
 # ============================================================================
 # PAGE: ACCUEIL
@@ -640,6 +712,12 @@ def show_optimization_page():
             with st.expander("📊 Aperçu des Données de Prix"):
                 st.dataframe(prices.tail(10))
             
+            # Calculer les rendements pour les statistiques
+            returns = prices.pct_change().dropna()
+            
+            # === SECTION 1: STATISTIQUES DESCRIPTIVES (indépendantes de l'optimisation) ===
+            st.header("📊 Analyse des Données")
+            
             # Statistiques descriptives
             st.subheader("📈 Statistiques Descriptives des Actifs")
             desc_stats = get_descriptive_stats(prices)
@@ -652,9 +730,17 @@ def show_optimization_page():
             
             # Matrice de corrélation
             st.subheader("🔗 Matrice de Corrélation")
-            returns = prices.pct_change().dropna()
             fig_corr = plot_correlation_matrix(returns)
             st.plotly_chart(fig_corr, use_container_width=True)
+            
+            # Dendrogramme pour les modèles hiérarchiques
+            if selected_model in ["Hierarchical Risk Parity (HRP)", 
+                                 "Hierarchical Equal Risk Contribution (HERC)", 
+                                 "Nested Clustered Optimization (NCO)"]:
+                st.subheader("🌳 Dendrogramme (Clustering Hiérarchique)")
+                fig_dendro = plot_dendrogram(returns, linkage='ward', codependence='pearson')
+                if fig_dendro:
+                    st.plotly_chart(fig_dendro, use_container_width=True)
             
             # Tableau de performance
             st.subheader("📊 Tableau de Performance et Indicateurs de Risque")
@@ -678,17 +764,20 @@ def show_optimization_page():
                 
                 st.dataframe(styled_perf, use_container_width=True)
             
-            # Calculate optimal portfolio
+            st.markdown("---")
+            
+            # === SECTION 2: OPTIMISATION DU PORTEFEUILLE ===
             st.header("🎯 Résultats de l'Optimisation")
             
-            weights, port = calculate_portfolio(
-                prices, 
-                selected_model, 
-                risk_measure, 
-                risk_free_rate, 
-                risk_aversion,
-                uncertainty_param
-            )
+            with st.spinner("Optimisation du portefeuille en cours..."):
+                weights, port, returns_calc = calculate_portfolio(
+                    prices, 
+                    selected_model, 
+                    risk_measure, 
+                    risk_free_rate, 
+                    risk_aversion,
+                    uncertainty_param
+                )
             
             if weights is not None and port is not None:
                 # Display results
@@ -742,11 +831,16 @@ def show_optimization_page():
                 fig_bar = plot_weights(weights)
                 st.plotly_chart(fig_bar, use_container_width=True)
                 
-                # Efficient Frontier
-                st.subheader("📉 Frontière Efficiente")
-                fig_frontier = plot_efficient_frontier(port, weights, risk_measure)
-                if fig_frontier:
-                    st.plotly_chart(fig_frontier, use_container_width=True)
+                # Efficient Frontier (seulement pour les modèles classiques)
+                if selected_model not in ["Hierarchical Risk Parity (HRP)", 
+                                         "Hierarchical Equal Risk Contribution (HERC)", 
+                                         "Nested Clustered Optimization (NCO)"]:
+                    st.subheader("📉 Frontière Efficiente")
+                    fig_frontier = plot_efficient_frontier(port, weights, risk_measure)
+                    if fig_frontier:
+                        st.plotly_chart(fig_frontier, use_container_width=True)
+                else:
+                    st.info("ℹ️ La frontière efficiente n'est pas disponible pour les modèles hiérarchiques.")
                 
                 # Download weights as CSV
                 csv = weights_display.to_csv()
