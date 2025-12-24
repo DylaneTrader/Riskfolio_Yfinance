@@ -130,9 +130,9 @@ def download_data(tickers, start_date, end_date):
     try:
         data = yf.download(tickers, start=start_date, end=end_date, progress=False)
         if isinstance(data.columns, pd.MultiIndex):
-            prices = data['Adj Close']
+            prices = data['Close']
         else:
-            prices = data[['Adj Close']]
+            prices = data[['Close']]
         
         # Clean data
         prices = prices.dropna(how='all')
