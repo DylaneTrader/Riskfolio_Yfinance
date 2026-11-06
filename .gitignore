@@ -37,8 +37,9 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Streamlit
-.streamlit/
+# Streamlit : le thème (config.toml) est suivi, jamais les secrets
+.streamlit/secrets.toml
+.env
 
 # Temporary files
 tmp/

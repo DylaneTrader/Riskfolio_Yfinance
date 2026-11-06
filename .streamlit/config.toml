@@ -1,0 +1,21 @@
+# Charte commune avec BRVM Analytics.
+[theme]
+base = "light"
+primaryColor = "#0C64CF"
+backgroundColor = "#FAFAFC"
+secondaryBackgroundColor = "#F2F5FF"
+textColor = "#001A26"
+linkColor = "#0C64CF"
+borderColor = "#D5D7DD"
+font = "Cambria, 'Times New Roman', Georgia, serif"
+headingFont = "Cambria, 'Times New Roman', Georgia, serif"
+baseRadius = "0.5rem"
+showSidebarBorder = true
+
+[theme.sidebar]
+backgroundColor = "#001A26"
+secondaryBackgroundColor = "#003250"
+textColor = "#F2F5FF"
+primaryColor = "#7EA7F9"
+linkColor = "#B9CCFE"
+borderColor = "#01467A"
